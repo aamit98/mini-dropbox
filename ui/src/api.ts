@@ -1,11 +1,12 @@
-// ui/src/api.ts
-const API = import.meta.env.VITE_API ?? ""; // vite proxy forwards /api to :8080
+const API = import.meta.env.VITE_API ?? ""; // leave VITE_API undefined in dev
+
 
 /* ---------------- Token helpers ---------------- */
 const KEY = "token";
 export function setToken(t: string){ localStorage.setItem(KEY, t); }
 export function getToken(){ return localStorage.getItem(KEY) || ""; }
 export function clearToken(){ localStorage.removeItem(KEY); }
+export type ShareOptions = { hours?: number; maxDownloads?: number; versionId?: number };
 
 /* ---------------- Headers ---------------- */
 export function authHeaders(): Record<string, string> {
@@ -38,32 +39,67 @@ export async function login(username: string, password: string){
   return j;
 }
 
-export async function me(): Promise<{username: string}>{
+export async function me(): Promise<{username: string, admin?: boolean}>{
   const r = await fetch(`${API}/api/auth/me`, { headers: authHeaders() });
   if (!r.ok) throw new Error("Not logged in");
   return r.json();
 }
 
-/* ---------------- Files (v1) ---------------- */
+/* ---------------- Files (v2) ---------------- */
 export async function listFiles(): Promise<string[]>{
-  const r = await fetch(`${API}/api/files`, { headers: authHeaders() });
+  const r = await fetch(`${API}/api/v2/files`, { headers: authHeaders() });
   if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  const entries = await r.json();
+  return entries.map((entry: any) => entry.logicalName);
+}
+
+export async function listRecents(): Promise<string[]>{
+  const r = await fetch(`${API}/api/v2/files/recents`, { headers: authHeaders() });
+  if (!r.ok) throw new Error(await r.text());
+  const entries = await r.json();
+  return entries.map((entry: any) => entry.logicalName);
+}
+
+export async function listDeleted(): Promise<string[]>{
+  const r = await fetch(`${API}/api/v2/files/deleted`, { headers: authHeaders() });
+  if (!r.ok) throw new Error(await r.text());
+  const entries = await r.json();
+  return entries.map((entry: any) => entry.logicalName);
+}
+
+export async function undeleteFile(name: string){
+  const r = await fetch(`${API}/api/v2/files/${encodeURIComponent(name)}/undelete`, {
+    method: "POST",
+    headers: authHeaders()
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+export async function deleteFile(name: string){
+  const r = await fetch(`${API}/api/v2/files/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (!r.ok) throw new Error(await r.text());
 }
 
 export async function uploadFile(file: File){
   const fd = new FormData();
   fd.append("file", file);
-  const r = await fetch(`${API}/api/files/upload`, {
+  const r = await fetch(`${API}/api/v2/files/upload`, {
     method: "POST",
     headers: authHeaders(),
     body: fd
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) {
+    const t = await r.text().catch(()=> "upload failed");
+    throw new Error(t || "upload failed");
+  }
+  return r.json();
 }
 
 export async function downloadFile(name: string, signal?: AbortSignal): Promise<Blob>{
-  const r = await fetch(`${API}/api/files/${encodeURIComponent(name)}`, {
+  const r = await fetch(`${API}/api/v2/files/${encodeURIComponent(name)}`, {
     headers: authHeaders(),
     signal
   });
@@ -71,7 +107,7 @@ export async function downloadFile(name: string, signal?: AbortSignal): Promise<
   return r.blob();
 }
 
-/* ---------------- Optional thumbnails (works when backend adds it) ---------------- */
+/* ---------------- Optional thumbnails ---------------- */
 export async function getThumbURL(name: string): Promise<string | null> {
   try {
     const r = await fetch(`${API}/api/files/${encodeURIComponent(name)}/thumb`, {
@@ -96,18 +132,20 @@ export async function fetchRecentLogs(limit = 50): Promise<TftpLogEvent[]>{
 }
 
 export function streamLogs(onEvent: (e: TftpLogEvent)=>void): () => void {
-  const es = new EventSource(`${API}/api/logs/stream`);
-  es.onmessage = (m) => {
-    try { onEvent(JSON.parse(m.data)); } catch {}
-  };
+  const token = getToken(); // read from localStorage
+  const url = token ? `/api/logs/stream?token=${encodeURIComponent(token)}` : `/api/logs/stream`;
+  const es = new EventSource(url);
+  es.onmessage = (m) => { try { onEvent(JSON.parse(m.data)); } catch {} };
   es.onerror = () => { es.close(); };
   return () => es.close();
 }
-
-/* ---------------- Versions (placeholder endpoints) ---------------- */
-// Backend you’ll add later (suggested paths).
+/* ---------------- Versions (v2) ---------------- */
 export type FileVersion = {
-  id: number; versionNo: number; size: number; createdAt: number; createdBy: string;
+  id: number; 
+  versionNo: number; 
+  sizeBytes: number;  // FIXED: Changed from 'size' to 'sizeBytes'
+  createdAt: number; 
+  createdBy: string;
 };
 
 export async function listVersions(name: string): Promise<FileVersion[]>{
@@ -118,21 +156,49 @@ export async function listVersions(name: string): Promise<FileVersion[]>{
   return r.json();
 }
 
-export async function restoreVersion(name: string, versionId: number): Promise<void>{
-  const r = await fetch(`${API}/api/v2/files/${encodeURIComponent(name)}/restore?version=${versionId}`, {
+export async function restoreVersion(name: string, versionNo: number): Promise<void>{
+  const r = await fetch(`${API}/api/v2/files/${encodeURIComponent(name)}/restore?version=${versionNo}`, {
     method: "POST",
     headers: authHeaders()
   });
   if (!r.ok) throw new Error(await r.text());
 }
 
-/* ---------------- Share links (placeholder endpoints) ---------------- */
-export type ShareOptions = { hours?: number; maxDownloads?: number; versionId?: number };
 export async function createShare(name: string, opts: ShareOptions): Promise<{ url: string }>{
+  const body: any = {};
+  if (opts.hours !== undefined) body.hours = opts.hours;
+  if (opts.maxDownloads !== undefined) body.maxDownloads = opts.maxDownloads;
+  if (opts.versionId !== undefined) body.version = opts.versionId;
   const r = await fetch(`${API}/api/v2/files/${encodeURIComponent(name)}/share`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(opts)
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ---------------- Admin ---------------- */
+export type UserInfo = { username: string; admin: boolean };
+
+export async function listUsers(): Promise<UserInfo[]>{
+  const r = await fetch(`${API}/api/admin/users`, { headers: authHeaders() });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteUser(username: string){
+  const r = await fetch(`${API}/api/admin/users/${encodeURIComponent(username)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+export async function toggleAdmin(username: string): Promise<UserInfo>{
+  const r = await fetch(`${API}/api/admin/users/${encodeURIComponent(username)}/toggle-admin`, {
+    method: "POST",
+    headers: authHeaders()
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();

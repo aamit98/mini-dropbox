@@ -27,9 +27,9 @@ public class AuthController {
         || c.username().isBlank() || c.password().isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing creds");
     }
-    repo.findByUsername(c.username()).ifPresent(u -> {
+    if (repo.existsByUsername(c.username())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "exists");
-    });
+    }
     var u = new UserAccount();
     u.setUsername(c.username());
     u.setPasswordHash(encoder.encode(c.password()));
@@ -38,7 +38,7 @@ public class AuthController {
 
   @PostMapping("/login")
   public Map<String,String> login(@RequestBody Creds c) {
-    var u = repo.findByUsername(c.username())
+    var u = repo.findFirstByUsername(c.username())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials"));
     if (!encoder.matches(c.password(), u.getPasswordHash())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials");
@@ -48,8 +48,10 @@ public class AuthController {
   }
 
   @GetMapping("/me")
-  public Map<String,String> me(@org.springframework.security.core.annotation.AuthenticationPrincipal Object principal){
+  public Map<String,Object> me(@org.springframework.security.core.annotation.AuthenticationPrincipal Object principal){
     if (principal == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no auth");
-    return Map.of("username", principal.toString());
+    var u = repo.findFirstByUsername(principal.toString())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no user"));
+    return Map.of("username", u.getUsername(), "admin", u.isAdmin());
   }
 }

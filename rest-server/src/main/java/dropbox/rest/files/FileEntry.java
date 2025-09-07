@@ -6,7 +6,8 @@ import java.time.Instant;
 @Entity
 @Table(name="file_entries", indexes = {
         @Index(name="ix_entry_owner", columnList = "owner"),
-        @Index(name="ix_entry_owner_name", columnList = "owner,logicalName", unique = true)
+        @Index(name="ix_entry_owner_name", columnList = "owner,logicalName", unique = true),
+        @Index(name="ix_entry_deleted", columnList = "deleted")
 })
 public class FileEntry {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,6 +25,9 @@ public class FileEntry {
     @Column(nullable=false, updatable=false)
     private Instant createdAt = Instant.now();
 
+    @Column(nullable=false)
+    private boolean deleted = false;
+
     // getters/setters
     public Long getId() { return id; }
     public String getOwner() { return owner; }
@@ -33,4 +37,6 @@ public class FileEntry {
     public FileVersion getCurrentVersion() { return currentVersion; }
     public void setCurrentVersion(FileVersion currentVersion) { this.currentVersion = currentVersion; }
     public Instant getCreatedAt() { return createdAt; }
+    public boolean isDeleted() { return deleted; }
+    public void setDeleted(boolean deleted) { this.deleted = deleted; }
 }

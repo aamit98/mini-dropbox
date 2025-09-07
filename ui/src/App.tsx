@@ -3,19 +3,27 @@ import ActivityPanel from "./ActivityPanel";
 import Files from "./Files";
 import { clearToken, getToken, me } from "./api";
 import AuthPage from "./Authpage";
+import AdminPanel from "./AdminPanel";
+
+type Mode = "files" | "recents" | "deleted" | "admin";
 
 export default function App() {
   const [username, setUsername] = useState<string>("");
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [mode, setMode] = useState<Mode>("files");
+  const [query, setQuery] = useState("");
 
   async function hydrate() {
     const t = getToken();
-    if (!t) { setUsername(""); return; }
+    if (!t) { setUsername(""); setIsAdmin(false); return; }
     try {
       const m = await me();
       setUsername(m.username || "");
+      setIsAdmin(!!m.admin);
     } catch {
       clearToken();
       setUsername("");
+      setIsAdmin(false);
     }
   }
 
@@ -24,23 +32,23 @@ export default function App() {
   function logout() {
     clearToken();
     setUsername("");
+    setIsAdmin(false);
   }
 
-  // Guard: if not logged in, show full-screen auth page
   if (!username) {
-    return <AuthPage onLoggedIn={(u) => setUsername(u)} />;
+    return <AuthPage onLoggedIn={(u) => { setUsername(u); hydrate(); }} />;
   }
 
-  // Logged in: show the app
   return (
     <div className="app">
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="logo"><div className="dot" /> Mini Dropbox</div>
         <nav className="nav">
-          <a className="active">Files</a>
-          <a>Recents</a>
-          <a>Deleted</a>
+          <a className={mode==="files"?"active":""} onClick={()=>setMode("files")}>Files</a>
+          <a className={mode==="recents"?"active":""} onClick={()=>setMode("recents")}>Recents</a>
+          <a className={mode==="deleted"?"active":""} onClick={()=>setMode("deleted")}>Deleted</a>
+          {isAdmin && <a className={mode==="admin"?"active":""} onClick={()=>setMode("admin")}>Admin</a>}
         </nav>
         <div style={{marginTop:"auto", color:"var(--muted)"}}>© You</div>
       </aside>
@@ -48,28 +56,35 @@ export default function App() {
       {/* Main column */}
       <section className="main">
         <div className="topbar">
-          <div className="h1">Your files</div>
+          <div className="h1">{mode==="files"?"Your files": mode==="recents"?"Recent files": mode==="deleted"?"Deleted files":"Admin"}</div>
 
-          <div className="search">
-            <span className="icon">🔎</span>
-            <input placeholder="Search (client side)" />
-          </div>
+          {mode!=="admin" && (
+            <div className="search">
+              <span className="icon">🔎</span>
+              <input placeholder="Search (client side)" value={query} onChange={e=>setQuery(e.target.value)} />
+            </div>
+          )}
 
           <div className="rightbar">
-            <div className="pill">Signed in as <strong style={{marginLeft:6}}>{username}</strong></div>
+            <div className="pill">Signed in as <strong style={{marginLeft:6}}>{username}{isAdmin?" (admin)":""}</strong></div>
             <button type="button" className="btn" onClick={logout}>Logout</button>
           </div>
         </div>
 
         <div className="content">
           <div className="card">
-            <Files username={username} onLogout={logout} />
+            {mode==="admin"
+              ? <AdminPanel />
+              : <Files username={username} onLogout={logout} mode={mode} query={query} />
+            }
           </div>
 
-          <div style={{display:"grid", gap:14}}>
-            <PreviewDock />
-            <ActivityPanel />
-          </div>
+          {mode!=="admin" && (
+            <div style={{display:"grid", gap:14}}>
+              <PreviewDock />
+              <ActivityPanel />
+            </div>
+          )}
         </div>
       </section>
     </div>

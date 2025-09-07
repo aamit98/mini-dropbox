@@ -1,6 +1,7 @@
 package dropbox.rest.files;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 
 @Entity
@@ -13,6 +14,7 @@ public class FileVersion {
     private Long id;
 
     @ManyToOne(optional=false)
+    @JsonIgnore  // ADDED: Prevents circular reference during JSON serialization
     private FileEntry fileEntry;
 
     @Column(nullable=false)

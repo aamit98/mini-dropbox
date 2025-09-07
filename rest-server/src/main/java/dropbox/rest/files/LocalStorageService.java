@@ -1,4 +1,3 @@
-// rest-server/src/main/java/dropbox/rest/files/LocalStorageService.java
 package dropbox.rest.files;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +35,13 @@ public class LocalStorageService implements StorageService {
 
   @Override
   public void put(String owner, String name, InputStream in, long sizeHint) throws IOException {
-    Files.copy(in, userDir(owner).resolve(name), StandardCopyOption.REPLACE_EXISTING);
+    // normalize and ensure the target stays under the user's directory
+    Path tgt = userDir(owner).resolve(name.replace('\\','/')).normalize();
+    if (!tgt.startsWith(userDir(owner))) throw new SecurityException("bad path");
+    // ✅ make sure parent folders exist (e.g. ".versions/...")
+    Path parent = tgt.getParent();
+    if (parent != null) Files.createDirectories(parent);
+    Files.copy(in, tgt, StandardCopyOption.REPLACE_EXISTING);
   }
 
   @Override

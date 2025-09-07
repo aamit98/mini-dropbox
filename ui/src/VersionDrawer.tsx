@@ -7,16 +7,22 @@ export default function VersionDrawer({name, onClose}:{name:string, onClose:()=>
 
   useEffect(()=>{
     (async ()=>{
-      try { setRows(await listVersions(name)); }
-      catch { setMsg("Version API not implemented yet"); }
+      try { setRows(await listVersions(name)); setMsg(""); }
+      catch (e:any) {
+        setMsg("No versions found for this file (upload it again to enable versions).");
+      }
     })();
   },[name]);
 
   async function doRestore(v: FileVersion){
-    try { await restoreVersion(name, v.id); setMsg(`Restored to v${v.versionNo}`); }
-    catch { setMsg("Restore endpoint not implemented"); }
+    try {
+      await restoreVersion(name, v.versionNo);
+      setMsg(`Restored to v${v.versionNo}`);
+    } catch {
+      setMsg("Restore endpoint not implemented");
+    }
   }
-
+  
   return (
     <div className="drawer">
       <div className="drawer-head">
@@ -32,7 +38,7 @@ export default function VersionDrawer({name, onClose}:{name:string, onClose:()=>
             {rows.map(v=>(
               <tr key={v.id}>
                 <td>v{v.versionNo}</td>
-                <td>{(v.size/1024).toFixed(1)} KB</td>
+                <td>{(v.sizeBytes/1024).toFixed(1)} KB</td>
                 <td>{new Date(v.createdAt).toLocaleString()}</td>
                 <td>{v.createdBy}</td>
                 <td className="cell-right"><a className="link" onClick={()=>doRestore(v)}>Restore</a></td>

@@ -9,11 +9,15 @@ export default function ShareModal({name, onClose}:{name:string, onClose:()=>voi
 
   async function doCreate(){
     setErr("");
+    setUrl("");
     try {
       const r = await createShare(name, { hours, maxDownloads: maxDls });
-      setUrl(r.url);
-    } catch {
-      setErr("Share endpoint not implemented yet");
+      // show absolute URL so you can click it right away
+      const absolute = `${window.location.origin}${r.url}`;
+      setUrl(absolute);
+    } catch (e:any) {
+      // show what actually happened (404 from v2 is the common case)
+      setErr(typeof e?.message === "string" ? e.message : "Share failed");
     }
   }
 
@@ -42,7 +46,7 @@ export default function ShareModal({name, onClose}:{name:string, onClose:()=>voi
           {err && <div className="err">{err}</div>}
           {url && (
             <div>
-              <div className="pill" style={{display:"inline-block"}}>{url}</div>
+              <a className="pill" href={url} target="_blank" rel="noreferrer">{url}</a>
               <button className="btn" onClick={copy} style={{marginLeft:8}}>Copy</button>
             </div>
           )}
