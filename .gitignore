@@ -1,0 +1,53 @@
+### Java / Maven ###
+*.class
+*.log
+*.ctxt
+.mtj.tmp/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+
+# Maven / Gradle
+target/
+build/
+
+### Node / Vite ###
+node_modules/
+dist/
+.vite/
+.eslintcache
+
+# Env files
+.env
+.env.*
+
+# Vite build cache
+*.tsbuildinfo
+
+### IDEs ###
+# IntelliJ / JetBrains
+.idea/
+*.iml
+out/
+
+# VS Code
+.vscode/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Logs ###
+*.log
+logs/
+
+# Other ###
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

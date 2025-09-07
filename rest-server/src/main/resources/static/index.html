@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mini Dropbox</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{color-scheme:dark light}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b1220;color:#eef}
+  header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:#0d1628;border-bottom:1px solid #1c2743}
+  h1{margin:0;font-weight:700}
+  .sp{flex:1}
+  input,button{font:inherit}
+  button{padding:8px 14px;border-radius:10px;border:1px solid #2a3558;background:#16213a;color:#eaf;cursor:pointer}
+  button:hover{background:#1a2749}
+  .card{margin:20px;border:1px solid #1c2743;border-radius:14px;overflow:hidden}
+  .toolbar{display:flex;gap:10px;align-items:center;padding:12px 14px;background:#0e1932;border-bottom:1px solid #1c2743}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:14px;border-bottom:1px solid #18213a}
+  th{text-align:left;color:#a9b7ff;background:#0e1932;position:sticky;top:0}
+  .row:hover{background:#0f1d3a}
+  .right{text-align:right}
+  .muted{color:#9ab}
+  .pill{padding:2px 8px;border-radius:999px;font-size:12px;background:#1a2b56;color:#cde}
+  .log{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;font-size:12px;white-space:nowrap}
+  .ok{color:#61ffa8}
+  .err{color:#ff6b6b}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Mini Dropbox</h1><div class="sp"></div>
+    <input id="user" placeholder="username"/>
+    <input id="pass" type="password" placeholder="password"/>
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <span id="who" class="muted"></span>
+  </header>
+
+  <div class="card">
+    <div class="toolbar">
+      <input id="file" type="file"/>
+      <button onclick="upload()">Upload</button>
+      <button onclick="refresh()">Refresh</button>
+      <span id="msg" class="muted"></span>
+    </div>
+    <table id="tbl">
+      <thead><tr>
+        <th>Name</th><th class="right">Size</th><th>Type</th><th>SHA-256</th><th>Version</th><th>Updated</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="toolbar"><strong>Live TFTP Logs</strong></div>
+    <div id="logs" style="padding:12px;max-height:260px;overflow:auto"></div>
+  </div>
+
+<script>
+  const api = p => location.origin + p;
+  let token = localStorage.getItem("token") || "";
+  let me = localStorage.getItem("user") || "";
+  updateWho();
+
+  function updateWho(){
+    document.getElementById('who').textContent = token ? `Logged in as ${me}` : 'Not logged in';
+  }
+
+  async function register(){
+    const username = document.getElementById('user').value.trim();
+    const password = document.getElementById('pass').value;
+    await fetch(api('/api/auth/register'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password})});
+    document.getElementById('msg').textContent = 'Registered. Now login.';
+  }
+
+  async function login(){
+    const username = document.getElementById('user').value.trim();
+    const password = document.getElementById('pass').value;
+    const r = await fetch(api('/api/auth/login'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password})});
+    const j = await r.json();
+    token = j.token; me = username;
+    localStorage.setItem("token", token); localStorage.setItem("user", me);
+    updateWho();
+    refresh(); startLogs();
+  }
+
+  function auth(){ return token ? {'Authorization': 'Bearer '+token} : {} }
+
+  async function refresh(){
+    if (!token){ document.getElementById('rows').innerHTML=""; return; }
+    const r = await fetch(api('/api/files'), {headers: auth()});
+    const list = await r.json(); // filenames only
+    // fetch metadata (optional: you can add an API for meta list; here we infer without extra call)
+    const rows = document.getElementById('rows'); rows.innerHTML = "";
+    for (const name of list){
+      const tr = document.createElement('tr'); tr.className="row";
+      tr.innerHTML = `
+        <td>${name}</td>
+        <td class="right"></td>
+        <td class="muted"></td>
+        <td class="muted"></td>
+        <td class="muted"></td>
+        <td class="muted"></td>
+        <td>
+          <button onclick="download('${name}')">Download</button>
+          <button onclick="delFile('${name}')">Delete</button>
+        </td>`;
+      rows.appendChild(tr);
+    }
+  }
+
+  async function upload(){
+    if (!token) return;
+    const f = document.getElementById('file').files[0];
+    if (!f) return;
+    const fd = new FormData(); fd.append('file', f);
+    const r = await fetch(api('/api/files/upload'), {method:'POST', headers: auth(), body: fd});
+    const t = await r.text();
+    document.getElementById('msg').textContent = t;
+    refresh();
+  }
+
+  async function download(name){
+    const r = await fetch(api('/api/files/'+encodeURIComponent(name)), {headers: auth()});
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function delFile(name){
+    await fetch(api('/api/files/'+encodeURIComponent(name)), {method:'DELETE', headers: auth()});
+    refresh();
+  }
+
+  function startLogs(){
+    const div = document.getElementById('logs');
+    div.innerHTML = "";
+    const es = new EventSource(api('/api/logs/stream'));
+    es.onmessage = ev => {
+      const e = JSON.parse(ev.data);
+      const line = document.createElement('div'); line.className = 'log';
+      const cls = e.event.startsWith('ERR') ? 'err' : (e.event.startsWith('ACK') || e.event.startsWith('FILE_') ? 'ok':'');
+      line.innerHTML = `<span class="${cls}">[${new Date(e.ts).toLocaleTimeString()}] ${e.event}</span> ` +
+                       `${e.user?('user='+e.user+' '):''}${e.file?('file='+e.file+' '):''}` +
+                       `${e.block!=null?('block='+e.block+' '):''}${e.code!=null?('code='+e.code+' '):''}${e.msg?('- '+e.msg):''}`;
+      div.appendChild(line);
+      div.scrollTop = div.scrollHeight;
+    };
+  }
+
+  if (token){ refresh(); startLogs(); }
+</script>
+</body>
+</html>
