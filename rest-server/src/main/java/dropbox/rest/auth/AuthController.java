@@ -27,11 +27,29 @@ public class AuthController {
         || c.username().isBlank() || c.password().isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing creds");
     }
-    if (repo.existsByUsername(c.username())) {
+
+    // Validate username
+    String username = c.username().trim();
+    if (username.length() < 3 || username.length() > 50) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "username must be 3-50 characters");
+    }
+    if (!username.matches("^[a-zA-Z0-9_-]+$")) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "username can only contain letters, numbers, underscore, and hyphen");
+    }
+
+    // Validate password strength
+    if (c.password().length() < 6) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password must be at least 6 characters");
+    }
+    if (c.password().length() > 100) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password cannot exceed 100 characters");
+    }
+
+    if (repo.existsByUsername(username)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "exists");
     }
     var u = new UserAccount();
-    u.setUsername(c.username());
+    u.setUsername(username);
     u.setPasswordHash(encoder.encode(c.password()));
     repo.save(u);
   }

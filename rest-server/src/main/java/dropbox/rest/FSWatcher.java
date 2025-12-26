@@ -3,6 +3,8 @@ package dropbox.rest;
 import dropbox.rest.meta.FileMeta;
 import dropbox.rest.meta.FileMetaRepo;
 import dropbox.rest.util.FileUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 
@@ -11,6 +13,7 @@ import static java.nio.file.StandardWatchEventKinds.*;
 
 @Component
 public class FSWatcher {
+  private static final Logger log = LoggerFactory.getLogger(FSWatcher.class);
   private final Path baseDir;
   private final FileMetaRepo repo;
 
@@ -49,10 +52,14 @@ public class FSWatcher {
             } else if (ev.kind() == ENTRY_DELETE) {
               repo.deleteById(name);
             }
-          } catch (Exception ignore) {}
+          } catch (Exception e) {
+            log.warn("Error processing file system event for {}: {}", name, e.getMessage());
+          }
         }
         key.reset();
       }
-    } catch (Exception e) { e.printStackTrace(); }
+    } catch (Exception e) {
+      log.error("File system watcher terminated unexpectedly", e);
+    }
   }
 }

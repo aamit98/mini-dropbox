@@ -1,5 +1,7 @@
 package dropbox.rest.files;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,10 +16,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+// CORS configuration is handled globally in CorsConfig.java
 @RestController
 @RequestMapping("/api/v2/files")
-@CrossOrigin(origins="*")
 public class FilesV2Controller {
+    private static final Logger log = LoggerFactory.getLogger(FilesV2Controller.class);
     private final VersioningService versioning;
     private final FileEntryRepo entryRepo;
     private final StorageService storage;
@@ -67,29 +70,30 @@ public class FilesV2Controller {
             @RequestParam("file") MultipartFile file,
             @RequestParam(name="path", required=false) String logicalName) {
         try {
-            System.out.println("Upload attempt - User: " + principal.getName() + ", File: " + (file != null ? file.getOriginalFilename() : "null"));
-            
+            log.info("Upload attempt - User: {}, File: {}", principal.getName(),
+                    file != null ? file.getOriginalFilename() : "null");
+
             if (file==null || file.isEmpty()) {
-                System.out.println("ERROR: File is null or empty");
+                log.warn("Upload failed: File is null or empty");
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "empty");
             }
-            
+
             if (logicalName==null || logicalName.isBlank()) logicalName = file.getOriginalFilename();
             String clean = StringUtils.cleanPath(logicalName);
-            
-            System.out.println("Creating version for: " + clean);
+
+            log.debug("Creating version for: {}", clean);
             var v = versioning.createVersion(principal.getName(), clean, principal.getName(), file.getInputStream());
-            
-            System.out.println("Upload successful - Version: " + v.getVersionNo());
+
+            log.info("Upload successful - User: {}, File: {}, Version: {}",
+                    principal.getName(), clean, v.getVersionNo());
             return Map.of("ok", true, "name", clean, "version", v.getVersionNo(), "size", v.getSizeBytes());
-            
+
         } catch (ResponseStatusException rse) {
-            System.out.println("ResponseStatusException: " + rse.getMessage());
+            log.warn("Upload validation error: {}", rse.getReason());
             throw rse;
         } catch (Exception ex){
-            System.out.println("Unexpected error during upload: " + ex.getMessage());
-            ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex);
+            log.error("Unexpected error during upload", ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "upload failed", ex);
         }
     }
 
@@ -107,8 +111,11 @@ public class FilesV2Controller {
         String mime = Files.probeContentType(p);
         MediaType mt = (mime!=null ? MediaType.parseMediaType(mime) : MediaType.APPLICATION_OCTET_STREAM);
 
+        // Properly encode filename for Content-Disposition header
+        String encodedName = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\""+name+"\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedName)
                 .contentType(mt)
                 .body(bytes);
     }
@@ -156,15 +163,34 @@ public class FilesV2Controller {
         var e = entryRepo.findByOwnerAndLogicalNameAndDeletedFalse(principal.getName(), name)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "not found"));
         Integer version = req.get("version")==null? null : ((Number)req.get("version")).intValue();
+
+        // Validate and calculate TTL
         long ttlSec;
         if (req.containsKey("ttlSec")) {
             ttlSec = ((Number)req.get("ttlSec")).longValue();
         } else if (req.containsKey("hours")) {
             ttlSec = ((Number)req.get("hours")).longValue() * 3600L;
         } else {
-            ttlSec = 3600L;
+            ttlSec = 3600L; // default 1 hour
         }
+
+        // Validate TTL: must be between 1 minute and 30 days
+        if (ttlSec < 60) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "TTL must be at least 60 seconds");
+        }
+        if (ttlSec > 30L * 24 * 3600) { // 30 days
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "TTL cannot exceed 30 days");
+        }
+
+        // Validate maxDownloads
         Integer max = req.get("maxDownloads")==null? null : ((Number)req.get("maxDownloads")).intValue();
+        if (max != null && max < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxDownloads must be at least 1");
+        }
+        if (max != null && max > 10000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxDownloads cannot exceed 10000");
+        }
+
         var link = shareLinks.create(e, version, principal.getName(), Instant.now().plusSeconds(ttlSec), max);
         return Map.of("code", link.getCode(), "url", "/d/"+link.getCode());
     }

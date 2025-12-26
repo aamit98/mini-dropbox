@@ -17,9 +17,13 @@ export default function VersionDrawer({name, onClose}:{name:string, onClose:()=>
   async function doRestore(v: FileVersion){
     try {
       await restoreVersion(name, v.versionNo);
-      setMsg(`Restored to v${v.versionNo}`);
-    } catch {
-      setMsg("Restore endpoint not implemented");
+      setMsg(`✓ Restored to v${v.versionNo}`);
+      // Refresh version list after restore
+      setTimeout(() => {
+        listVersions(name).then(setRows).catch(() => {});
+      }, 500);
+    } catch (error: any) {
+      setMsg(`Failed to restore: ${error.message || 'Unknown error'}`);
     }
   }
   

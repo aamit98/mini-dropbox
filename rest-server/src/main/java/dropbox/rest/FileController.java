@@ -4,6 +4,8 @@ import dropbox.rest.meta.FileMeta;
 import dropbox.rest.meta.FileMetaRepo;
 import dropbox.rest.util.HashUtil;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.PathResource;
 import org.springframework.core.io.Resource;
@@ -24,10 +26,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@CrossOrigin(origins="*")
+// CORS configuration is handled globally in CorsConfig.java
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
+  private static final Logger log = LoggerFactory.getLogger(FileController.class);
   private final Path root;
   private final FileMetaRepo repo;
 
@@ -37,7 +40,7 @@ public class FileController {
     this.repo = repo;
   }
 
-  @PostConstruct public void logWhere(){ System.out.println("[REST] Base dir = " + root); }
+  @PostConstruct public void logWhere(){ log.info("File storage base directory: {}", root); }
   public Path getBaseDir(){ return root; }
 
   private Path userDir(String user) throws IOException {
@@ -140,7 +143,10 @@ public class FileController {
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''"+cdName)
         .contentType(mt)
         .body(body);
-    } catch (Exception e){ e.printStackTrace(); return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); }
+    } catch (Exception e){
+      log.error("Error downloading file: {} for user: {}", name, principal.getName(), e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
   }
 
   @DeleteMapping("/{name:.+}")
@@ -152,7 +158,11 @@ public class FileController {
       // move to .trash (soft delete)
       Path dest = trashDir(principal.getName()).resolve(p.getFileName().toString());
       Files.move(p, dest, StandardCopyOption.REPLACE_EXISTING);
-      try { repo.deleteById(principal.getName()+"/"+name); } catch (Exception ignore) {}
+      try {
+        repo.deleteById(principal.getName()+"/"+name);
+      } catch (Exception e) {
+        log.warn("Failed to delete file metadata for {}/{}: {}", principal.getName(), name, e.getMessage());
+      }
       return ResponseEntity.noContent().build();
     } catch (Exception e) {
       return ResponseEntity.noContent().build();
@@ -163,12 +173,27 @@ public class FileController {
   @PostMapping("/{name:.+}/undelete")
   public ResponseEntity<Void> undelete(@PathVariable("name") String name, Principal principal){
     try {
-      Path from = trashDir(principal.getName()).resolve(name).normalize();
-      Path to = userDir(principal.getName()).resolve(name).normalize();
+      // Validate filename to prevent path traversal
+      String clean = StringUtils.cleanPath(name);
+      if (clean.isBlank() || clean.contains("..") || clean.contains("/") || clean.contains("\\")) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+      }
+
+      Path from = trashDir(principal.getName()).resolve(clean).normalize();
+      Path to = userDir(principal.getName()).resolve(clean).normalize();
+
+      // Security check: ensure paths are within expected directories
+      if (!from.startsWith(trashDir(principal.getName())) ||
+          !to.startsWith(userDir(principal.getName()))) {
+        log.warn("Path traversal attempt in undelete: {}", name);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+      }
+
       if (!Files.exists(from)) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
       return ResponseEntity.noContent().build();
     } catch (Exception e){
+      log.error("Error restoring file {} for user {}", name, principal.getName(), e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
