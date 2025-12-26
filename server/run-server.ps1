@@ -16,7 +16,9 @@ if (Test-Path $mvn) { $env:Path = "$($env:JAVA_HOME)\bin;$([System.IO.Path]::Get
 else { $env:Path = "$($env:JAVA_HOME)\bin;$env:Path" }
 
 # ---- Shared config (match REST application.properties) ----
-$base     = "C:\Users\asher\OneDrive\Desktop\server_client porject\server\Files"
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent $scriptPath
+$base     = Join-Path $projectRoot "server\Files"
 $teleHost = "127.0.0.1"
 $telePort = 9099
 $port     = if ($args.Length -ge 1) { $args[0] } else { 7777 }
