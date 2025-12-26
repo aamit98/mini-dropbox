@@ -177,34 +177,6 @@ Or edit `rest-server/src/main/resources/application.properties`
 
 ## 🎯 What This Project Demonstrates
 
-### For Student/Junior Developer Roles
-
-This project showcases:
-
-1. **Full-Stack Development**
-   - Backend API design with Spring Boot
-   - Frontend development with React & TypeScript
-   - Database design and ORM usage
-
-2. **Security Knowledge**
-   - Understanding of common vulnerabilities (OWASP Top 10)
-   - Implementation of security best practices
-   - Secure authentication and authorization
-
-3. **Code Quality**
-   - Professional logging and error handling
-   - Input validation and defensive programming
-   - Clean code principles and maintainability
-
-4. **Software Engineering**
-   - Version control with meaningful commits
-   - Documentation (README, inline comments)
-   - Testing mindset and edge case handling
-
-5. **Problem-Solving**
-   - Identified and fixed multiple security issues
-   - Implemented complex features (versioning, sharing)
-   - Balanced security with usability
 
 ## 📚 Learning Outcomes
 
@@ -233,15 +205,6 @@ Potential improvements for production deployment:
 - [ ] Docker Compose for easy deployment
 - [ ] CI/CD pipeline with GitHub Actions
 
-## 📝 Notes for Recruiters
-
-**Why this project stands out:**
-
-- ✅ **Security-focused**: Demonstrates awareness of security vulnerabilities and how to fix them
-- ✅ **Production-ready**: Not just a demo - implemented proper logging, validation, error handling
-- ✅ **Well-documented**: Clear README, security documentation, and code comments
-- ✅ **Modern stack**: Current technologies (Java 17, Spring Boot 3, React 18)
-- ✅ **Full ownership**: Designed, implemented, and secured the entire application
 
 See [`SECURITY_IMPROVEMENTS.md`](./SECURITY_IMPROVEMENTS.md) for a detailed breakdown of the security audit and improvements.
 
