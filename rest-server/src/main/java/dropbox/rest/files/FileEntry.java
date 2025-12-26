@@ -1,6 +1,7 @@
 package dropbox.rest.files;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
 
 @Entity
@@ -9,6 +10,7 @@ import java.time.Instant;
         @Index(name="ix_entry_owner_name", columnList = "owner,logicalName", unique = true),
         @Index(name="ix_entry_deleted", columnList = "deleted")
 })
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class FileEntry {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,7 +21,7 @@ public class FileEntry {
     @Column(nullable=false, length=255)
     private String logicalName;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.EAGER)
     private FileVersion currentVersion;
 
     @Column(nullable=false, updatable=false)

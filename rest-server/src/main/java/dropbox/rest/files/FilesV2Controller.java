@@ -30,7 +30,16 @@ public class FilesV2Controller {
 
     @GetMapping
     public List<FileEntry> list(Principal principal){
-        return entryRepo.findByOwnerAndDeletedFalseOrderByLogicalNameAsc(principal.getName());
+        // Eagerly fetch currentVersion to avoid lazy loading issues
+        List<FileEntry> entries = entryRepo.findByOwnerAndDeletedFalseOrderByLogicalNameAsc(principal.getName());
+        // Initialize lazy-loaded relationships if needed
+        entries.forEach(e -> {
+            if (e.getCurrentVersion() != null) {
+                // Touch to initialize if it's a proxy
+                e.getCurrentVersion().getVersionNo();
+            }
+        });
+        return entries;
     }
 
     @GetMapping("/recents")

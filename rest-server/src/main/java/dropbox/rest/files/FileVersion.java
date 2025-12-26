@@ -9,6 +9,7 @@ import java.time.Instant;
         @Index(name="ix_ver_entry", columnList = "fileEntry_id"),
         @Index(name="ix_ver_entry_no", columnList = "fileEntry_id,versionNo", unique = true)
 })
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class FileVersion {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
