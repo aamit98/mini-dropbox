@@ -251,8 +251,8 @@ MIT
 
 ---
 
-**Author**: [Your Name]
-**Contact**: [Your Email]
-**LinkedIn**: [Your Profile]
-**GitHub**: [Your Profile]
+**Author**: Amit Asher
+**Contact**: asherproc@gmail.com
+**LinkedIn**: https://www.linkedin.com/in/amit-asher-555757382/
+**GitHub**: https://github.com/aamit98
 
