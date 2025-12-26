@@ -29,6 +29,9 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.5.1</version>
+        <configuration>
+          <mainClass>bgu.spl.net.impl.tftp.TftpServer</mainClass>
+        </configuration>
       </plugin>
     </plugins>
   </build>

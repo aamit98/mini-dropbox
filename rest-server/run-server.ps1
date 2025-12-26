@@ -32,9 +32,15 @@ $env:STORAGE_DIR = $storageDir
 
 Write-Host "Building REST server..." -ForegroundColor Cyan
 & $mvn -q clean compile
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Build failed!"
+  exit 1
+}
 
 Write-Host "Starting REST server on port 8080" -ForegroundColor Green
 Write-Host "Storage directory: $storageDir" -ForegroundColor Cyan
+Write-Host "Access the API at: http://localhost:8080/api" -ForegroundColor Yellow
+Write-Host ""
 
 & $mvn spring-boot:run
 

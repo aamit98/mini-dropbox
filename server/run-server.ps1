@@ -23,23 +23,37 @@ $teleHost = "127.0.0.1"
 $telePort = 9099
 $port     = if ($args.Length -ge 1) { $args[0] } else { 7777 }
 
+# Find Maven
+$mvn = "$env:USERPROFILE\scoop\apps\maven\current\bin\mvn.cmd"
+if (-not (Test-Path $mvn)) {
+  $mvn = "mvn"
+  if (-not (Get-Command mvn -ErrorAction SilentlyContinue)) {
+    Write-Error "Maven not found. Please install Maven or ensure 'mvn' is on PATH."
+    exit 1
+  }
+}
+
 Write-Host "Building TFTP server..." -ForegroundColor Cyan
-& mvn -q clean compile
+& $mvn -q clean compile
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Build failed!"
+  exit 1
+}
 
 Write-Host "Ensuring base dir exists: $base" -ForegroundColor Cyan
-if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base | Out-Null }
+if (-not (Test-Path $base)) { 
+  New-Item -ItemType Directory -Path $base -Force | Out-Null 
+}
 
 Write-Host "Starting TftpServer on port $port" -ForegroundColor Green
+Write-Host "Storage directory: $base" -ForegroundColor Cyan
+Write-Host ""
 
-# Build a clean argument list for Maven without --% and without PowerShell backticks
-$mvArgs = @(
-  'exec:java',
-  "-Dexec.mainClass=bgu.spl.net.impl.tftp.TftpServer",
-  "-Dexec.args=$port",
-  "-Dstorage.base-dir=$base",
-  "-Dtelemetry.host=$teleHost",
+# Use exec-maven-plugin to run the server
+& $mvn exec:java `
+  "-Dexec.mainClass=bgu.spl.net.impl.tftp.TftpServer" `
+  "-Dexec.args=$port" `
+  "-Dexec.classpathScope=compile" `
+  "-Dstorage.base-dir=$base" `
+  "-Dtelemetry.host=$teleHost" `
   "-Dtelemetry.port=$telePort"
-)
-
-# Call Maven with arguments. PowerShell will pass each item as a single arg (spaces preserved).
-& mvn -q @mvArgs

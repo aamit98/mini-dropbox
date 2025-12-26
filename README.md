@@ -29,7 +29,11 @@ A full-stack cloud storage application with a modern web interface, REST API, an
 
 ### Starting the Application
 
-1. **Start REST Server** (port 8080):
+**Important**: There are two different servers:
+- **`rest-server/`** - Spring Boot REST API (for the web UI) - Use `mvn spring-boot:run`
+- **`server/`** - TFTP Server (traditional protocol) - Use `mvn exec:java`
+
+1. **Start REST Server** (port 8080) - **This is what you need for the web UI**:
    ```powershell
    cd rest-server
    .\run-server.ps1
