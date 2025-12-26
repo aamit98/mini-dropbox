@@ -1,8 +1,7 @@
 # 📦 Mini Dropbox
 
-A **production-grade**, full-stack cloud storage application featuring a modern React UI, secure REST API, file versioning, and shareable links. Built with enterprise security best practices and comprehensive input validation.
+ full-stack cloud storage application featuring a modern React UI, secure REST API, file versioning, and shareable links. Built with enterprise security best practices and comprehensive input validation.
 
-> 🎓 **Perfect Portfolio Project**: Demonstrates full-stack development, security hardening, API design, and modern DevOps practices.
 
 ## ✨ Key Features
 
