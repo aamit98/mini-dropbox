@@ -29,17 +29,26 @@ export default function Files({ username, onLogout, mode = "files", query = "" }
 
   async function refresh() {
     if (!username) { setRows([]); return; }
-    let names: string[] = [];
-    if (mode === "files") names = await listFiles();
-    else if (mode === "recents") names = await listRecents();
-    else names = await listDeleted();
+    try {
+      let names: string[] = [];
+      if (mode === "files") {
+        names = await listFiles();
+      } else if (mode === "recents") {
+        names = await listRecents();
+      } else {
+        names = await listDeleted();
+      }
 
-    if (query) {
-      const q = query.toLowerCase();
-      names = names.filter(n => n.toLowerCase().includes(q));
+      if (query) {
+        const q = query.toLowerCase();
+        names = names.filter(n => n.toLowerCase().includes(q));
+      }
+      setRows(names.map((n) => ({ name: n })));
+      if (names.length && !sel) setSel(names[0]);
+    } catch (err: any) {
+      console.error("Error refreshing file list:", err);
+      setMsg(`Error loading files: ${err?.message || "Unknown error"}`);
     }
-    setRows(names.map((n) => ({ name: n })));
-    if (names.length && !sel) setSel(names[0]);
   }
 
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [username, mode, query]);
@@ -62,17 +71,19 @@ export default function Files({ username, onLogout, mode = "files", query = "" }
     setUploading(true);
     setMsg(`Uploading ${selectedFile.name}...`);
     try {
-      await uploadFile(selectedFile);
+      const result = await uploadFile(selectedFile);
+      console.log("Upload result:", result);
       setMsg(`Successfully uploaded ${selectedFile.name}!`);
       setSelectedFile(null);
       if (inputRef.current) {
         inputRef.current.value = "";
       }
-      // Refresh file list after a short delay
-      setTimeout(() => {
-        refresh();
+      // Refresh file list immediately and again after a short delay to ensure it appears
+      await refresh();
+      setTimeout(async () => {
+        await refresh();
         setMsg("");
-      }, 1000);
+      }, 500);
     } catch (err: any) {
       console.error("Upload error:", err);
       const errorMsg = err?.message || err?.toString() || "Upload failed";

@@ -48,23 +48,40 @@ export async function me(): Promise<{username: string, admin?: boolean}>{
 /* ---------------- Files (v2) ---------------- */
 export async function listFiles(): Promise<string[]>{
   const r = await fetch(`${API}/api/v2/files`, { headers: authHeaders() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) {
+    const errorText = await r.text();
+    console.error("listFiles error:", r.status, errorText);
+    throw new Error(errorText || `Failed to list files: ${r.status}`);
+  }
   const entries = await r.json();
-  return entries.map((entry: any) => entry.logicalName);
+  console.log("listFiles response:", entries);
+  if (!Array.isArray(entries)) {
+    console.error("Expected array but got:", typeof entries, entries);
+    return [];
+  }
+  return entries.map((entry: any) => {
+    const name = entry.logicalName || entry.name || entry.filename;
+    if (!name) {
+      console.warn("Entry missing name field:", entry);
+    }
+    return name;
+  }).filter((name: string) => name); // Filter out any undefined/null names
 }
 
 export async function listRecents(): Promise<string[]>{
   const r = await fetch(`${API}/api/v2/files/recents`, { headers: authHeaders() });
   if (!r.ok) throw new Error(await r.text());
   const entries = await r.json();
-  return entries.map((entry: any) => entry.logicalName);
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry: any) => entry.logicalName || entry.name || entry.filename).filter((n: string) => n);
 }
 
 export async function listDeleted(): Promise<string[]>{
   const r = await fetch(`${API}/api/v2/files/deleted`, { headers: authHeaders() });
   if (!r.ok) throw new Error(await r.text());
   const entries = await r.json();
-  return entries.map((entry: any) => entry.logicalName);
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry: any) => entry.logicalName || entry.name || entry.filename).filter((n: string) => n);
 }
 
 export async function undeleteFile(name: string){
