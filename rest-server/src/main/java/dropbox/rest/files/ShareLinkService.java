@@ -3,20 +3,20 @@ package dropbox.rest.files;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Random;
 
 @Service
 public class ShareLinkService {
     private final ShareLinkRepo repo;
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     public ShareLinkService(ShareLinkRepo repo) { this.repo = repo; }
 
     private static final String B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     private static String randBase62(int len){
-        Random r = new Random();
         StringBuilder sb = new StringBuilder(len);
-        for (int i=0;i<len;i++) sb.append(B62.charAt(r.nextInt(B62.length())));
+        for (int i=0;i<len;i++) sb.append(B62.charAt(secureRandom.nextInt(B62.length())));
         return sb.toString();
     }
 

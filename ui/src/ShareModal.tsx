@@ -10,6 +10,25 @@ export default function ShareModal({name, onClose}:{name:string, onClose:()=>voi
   async function doCreate(){
     setErr("");
     setUrl("");
+
+    // Client-side validation
+    if (hours < 1) {
+      setErr("Hours must be at least 1");
+      return;
+    }
+    if (hours > 720) { // 30 days
+      setErr("Hours cannot exceed 720 (30 days)");
+      return;
+    }
+    if (maxDls < 1) {
+      setErr("Max downloads must be at least 1");
+      return;
+    }
+    if (maxDls > 10000) {
+      setErr("Max downloads cannot exceed 10000");
+      return;
+    }
+
     try {
       const r = await createShare(name, { hours, maxDownloads: maxDls });
       // show absolute URL so you can click it right away
@@ -35,11 +54,23 @@ export default function ShareModal({name, onClose}:{name:string, onClose:()=>voi
           <button className="btn" onClick={onClose}>Close</button>
         </div>
         <div className="pad" style={{display:"grid", gap:10}}>
-          <label>Expires in (hours)
-            <input type="number" value={hours} onChange={e=>setHours(Math.max(1, +e.target.value||1))}/>
+          <label>Expires in (hours, max 720)
+            <input
+              type="number"
+              min="1"
+              max="720"
+              value={hours}
+              onChange={e=>setHours(Math.max(1, Math.min(720, +e.target.value||1)))}
+            />
           </label>
-          <label>Max downloads
-            <input type="number" value={maxDls} onChange={e=>setMaxDls(Math.max(1, +e.target.value||1))}/>
+          <label>Max downloads (max 10000)
+            <input
+              type="number"
+              min="1"
+              max="10000"
+              value={maxDls}
+              onChange={e=>setMaxDls(Math.max(1, Math.min(10000, +e.target.value||1)))}
+            />
           </label>
 
           <button className="btn" onClick={doCreate}>Create</button>
