@@ -86,16 +86,40 @@ export async function deleteFile(name: string){
 export async function uploadFile(file: File){
   const fd = new FormData();
   fd.append("file", file);
-  const r = await fetch(`${API}/api/v2/files/upload`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: fd
-  });
-  if (!r.ok) {
-    const t = await r.text().catch(()=> "upload failed");
-    throw new Error(t || "upload failed");
+  
+  // Don't set Content-Type header - browser needs to set it with boundary for multipart/form-data
+  const headers = authHeaders();
+  
+  try {
+    const r = await fetch(`${API}/api/v2/files/upload`, {
+      method: "POST",
+      headers: headers, // Only Authorization header, no Content-Type
+      body: fd
+    });
+    
+    if (!r.ok) {
+      let errorText = "Upload failed";
+      try {
+        errorText = await r.text();
+        // Try to parse as JSON for better error messages
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorText = errorJson.message || errorJson.error || errorText;
+        } catch {
+          // Not JSON, use text as-is
+        }
+      } catch {
+        errorText = `Upload failed: ${r.status} ${r.statusText}`;
+      }
+      throw new Error(errorText);
+    }
+    return r.json();
+  } catch (error: any) {
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error("Network error: Could not connect to server. Is the REST server running?");
+    }
+    throw error;
   }
-  return r.json();
 }
 
 export async function downloadFile(name: string, signal?: AbortSignal): Promise<Blob>{

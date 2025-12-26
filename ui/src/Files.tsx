@@ -22,7 +22,9 @@ export default function Files({ username, onLogout, mode = "files", query = "" }
   const [sel, setSel] = useState<string>("");
   const [showHistory, setShowHistory] = useState<string | undefined>();
   const [showShare, setShowShare] = useState<string | undefined>();
-  const [msg, setMsg] = useState<string>("");                 // ← moved here
+  const [msg, setMsg] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -42,17 +44,41 @@ export default function Files({ username, onLogout, mode = "files", query = "" }
 
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [username, mode, query]);
 
-  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (!f) return;
+    setSelectedFile(f || null);
+    if (f) {
+      setMsg(`Selected: ${f.name} (${(f.size / 1024).toFixed(1)} KB)`);
+    }
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) {
+      setMsg("Please select a file first");
+      inputRef.current?.click();
+      return;
+    }
+
+    setUploading(true);
+    setMsg(`Uploading ${selectedFile.name}...`);
     try {
-      setMsg("");
-      await uploadFile(f);
-      refresh();
+      await uploadFile(selectedFile);
+      setMsg(`Successfully uploaded ${selectedFile.name}!`);
+      setSelectedFile(null);
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+      // Refresh file list after a short delay
+      setTimeout(() => {
+        refresh();
+        setMsg("");
+      }, 1000);
     } catch (err: any) {
-      setMsg(typeof err?.message === "string" ? err.message : "Upload failed");
+      console.error("Upload error:", err);
+      const errorMsg = err?.message || err?.toString() || "Upload failed";
+      setMsg(`Upload failed: ${errorMsg}`);
     } finally {
-      e.target.value = "";
+      setUploading(false);
     }
   }
 
@@ -105,14 +131,39 @@ export default function Files({ username, onLogout, mode = "files", query = "" }
       {mode === "files" && (
         <div className="toolbar">
           <div className="filepick">
-            <input ref={inputRef} id="fsel" type="file" onChange={onUpload} />
-            <label htmlFor="fsel" className="btn-outline">Choose file</label>
+            <input 
+              ref={inputRef} 
+              id="fsel" 
+              type="file" 
+              onChange={onFileSelect}
+              disabled={uploading}
+            />
+            <label htmlFor="fsel" className="btn-outline" style={{opacity: uploading ? 0.6 : 1}}>
+              {selectedFile ? `Selected: ${selectedFile.name}` : "Choose file"}
+            </label>
           </div>
-          <button className="btn" onClick={() => inputRef.current?.click()}>Upload</button>
-          <button className="btn-outline" onClick={refresh}>Refresh</button>
+          <button 
+            className="btn" 
+            onClick={handleUpload}
+            disabled={uploading || !selectedFile}
+            style={{opacity: (!selectedFile || uploading) ? 0.6 : 1}}
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
+          <button 
+            className="btn-outline" 
+            onClick={refresh}
+            disabled={uploading}
+          >
+            Refresh
+          </button>
           <div className="sp" />
           {username && <span className="badge">User: {username}</span>}
-          {!!msg && <div className="err" style={{ marginLeft: 12 }}>{msg}</div>}
+          {!!msg && (
+            <div className={msg.includes("failed") || msg.includes("Error") ? "err" : msg.includes("Success") ? "ok" : ""} style={{ marginLeft: 12, fontSize: "13px" }}>
+              {msg}
+            </div>
+          )}
         </div>
       )}
 
