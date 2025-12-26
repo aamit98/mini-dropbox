@@ -57,11 +57,18 @@ A full-stack cloud storage application with a modern web interface, REST API, an
 - REST API: http://localhost:8080/api
 - H2 Console: http://localhost:8080/h2-console (credentials in application.properties)
 
-### Default Admin Account
+### Login Instructions
 
-The application automatically creates an admin account on first run:
-- Username: `admin`
-- Password: `admin` (change this in production!)
+**Default Admin Account** (automatically created on first run):
+- **Username**: `admin`
+- **Password**: `admin`
+
+**Or create your own account:**
+1. Enter any username and password
+2. Click "Register" to create a new account
+3. Then click "Sign In" to login
+
+> **Note**: The admin account is automatically created when the REST server starts for the first time. After that, you can use it or create new accounts.
 
 ## Project Structure
 
